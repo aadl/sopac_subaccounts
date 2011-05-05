@@ -1,0 +1,70 @@
+.sopac-subaccount {
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #CCCCCC;
+  background-color: #FFFFDD;
+}
+
+.sopac-subaccount .remove-card {
+  float: right;
+  width: 160px;
+  margin-bottom: -15px;
+}
+
+.sopac-subaccount h3 {
+  margin-bottom: 0;
+  clear: right;
+}
+
+.sopac-subaccount .checkouts-wrapper {
+  width: 50%;
+  float: left;
+}
+.sopac-subaccount .checkouts {
+  margin-right: 5px;
+}
+.sopac-subaccount .renew-items {
+  width: 160px;
+  margin-left: auto;
+}
+
+.sopac-subaccount .holds-wrapper {
+  width: 50%;
+  float: right;
+}
+.sopac-subaccount .holds {
+  margin-left: 5px;
+}
+.sopac-subaccount .cancel-requests {
+  width: 160px;
+  margin-left: auto;
+}
+
+.sopac-subaccount table {
+  width: 100%;
+}
+
+table.sopac-subaccount-patinfo {
+  width: 50%;
+}
+
+.patroninfo-profile-wrapper {
+  width: 50%;
+  float: left;
+}
+.patroninfo-profile {
+  margin-right: 5px;
+}
+.patroninfo-profile h3 {
+  margin-top: 0;
+}
+
+.sopac-subaccount-table-wrapper {
+  width: 50%;
+  margin-left: auto;
+}
+.sopac-subaccount-table {
+  margin-left: 5px;
+}

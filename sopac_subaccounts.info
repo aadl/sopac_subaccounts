@@ -1,0 +1,6 @@
+; $Id$
+name = SOPAC Subaccounts
+description = Subaccounts Module for SOPAC
+package = SOPAC
+core = 6.x
+;dependencies[] = SOPAC

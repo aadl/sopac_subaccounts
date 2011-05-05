@@ -1,0 +1,328 @@
+<?php
+function sopac_subaccounts_menu() {
+  $items = array();
+
+  $items['user/subaccount'] = array(
+    'title' => 'My Additional Account',
+    'page callback' => 'sopac_subaccounts_page',
+    'access arguments' => array('access user pages'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/addcard'] = array(
+    'title' => 'Add Library Card',
+    'page callback' => 'sopac_subaccounts_add_page',
+    'page arguments' => array(1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/verifycard'] = array(
+    'title' => 'Verify Library Card',
+    'page callback' => 'sopac_subaccounts_verify_page',
+    'page arguments' => array(1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/removecard'] = array(
+    'title' => 'Remove Library Card',
+    'page callback' => 'sopac_subaccounts_remove',
+    'page arguments' => array(1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function sopac_subaccounts_user($op, &$edit, &$account, $category = NULL) {
+  if ($op == 'view') {
+    // Check for additional cards
+    if ($account->profile_pref_cardnum) {
+      drupal_add_css(drupal_get_path('module', 'sopac_subaccounts') . '/sopac_subaccounts.css');
+      $subaccount_table = array();
+      $locum = sopac_get_locum();
+      $locum_cfg = $locum->locum_config;
+
+      if (strlen($account->profile_pref_additional_cardnum)) {
+        foreach(explode(",", $account->profile_pref_additional_cardnum) as $n => $cardnum) {
+          $content = '';
+          $patinfo = $locum->get_patron_info($cardnum);
+          $account->content['addl_patron' . $n]['#title'] = $patinfo['name'] . "'s " . t(' Account Details');
+          $account->content['addl_patron' . $n]['#weight'] = $n + 4;
+          $account->content['addl_patron' . $n]['#type'] = 'sopac_subaccount';
+          $account->content['addl_patron' . $n]['#full_path'] = 'user/subaccount/' . $n;
+          $account->content['addl_patron' . $n]['#remove_path'] = 'user/' . $account->uid . '/removecard/' . $n;
+          $account->content['addl_patron' . $n]['#anchor'] = 'subaccount' . $n;
+
+          // Checkouts
+          $checkouts = $locum->get_patron_checkouts($cardnum, $locum_pass);
+          if ($checkout_total = count($checkouts)) {
+            $rows = array();
+            foreach($checkouts as $checkout) {
+              $rows[] = array(
+                'Title' => $checkout['title'],
+                'Format' => $locum_cfg['formats'][$checkout['bib']['mat_code']],
+                'Author' => $checkout['author'],
+                'Renews' => $checkout['numrenews'],
+                'Due Date' => date('m-d-Y', $checkout['duedate']),
+              );
+            }
+            $checkout_table = theme('table', array_keys($rows[0]), $rows);
+          }
+          else {
+            $checkout_table = t('No items checked out.');
+          }
+          $account->content['addl_patron' . $n]['#checkout_total'] = $checkout_total;
+          $account->content['addl_patron' . $n]['#checkouts'] = $checkout_table;
+
+          // Holds
+          $holds = $locum->get_patron_holds($cardnum, $ils_pass);
+          if ($hold_total = count($holds)) {
+            $rows = array();
+            foreach($holds as $hold) {
+              $rows[] = array(
+                'Title' => $hold['title'],
+                'Format' => $locum_cfg['formats'][$hold['bib']['mat_code']],
+                'Author' => $hold['author'],
+                'Status' => $hold['numrenews'],
+                'Pickup Location' => date('m-d-Y', $checkout['duedate']),
+              );
+            }
+            $holds_table = theme('table', array_keys($rows[0]), $rows);
+          }
+          else {
+            $holds_table = t('No items requested.');
+          }
+          $account->content['addl_patron' . $n]['#hold_total'] = $hold_total;
+          $account->content['addl_patron' . $n]['#holds'] = $holds_table;
+
+          // Add to summary table
+          $subaccount_table[] = array(
+            'Name' => l($patinfo['name'], '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
+            'Checkouts' => $checkout_total,
+            'Requests' => $hold_total,
+            'Balance' => '$' . number_format($userinfo['balance'], 2, '.', ''),
+            'Details' => l('Jump to Details', '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
+          );
+        }
+      }
+
+      $account->content['addl_accounts']['#title'] = t('Additional Accounts');
+      $account->content['addl_accounts']['#weight'] = 1;
+      $account->content['addl_accounts']['#type'] = 'sopac_subaccount_table';
+      $account->content['addl_accounts']['#uid'] = $account->uid;
+      if (count($subaccount_table)) {
+        $account->content['addl_accounts']['#subtable'] = theme('table', array_keys($subaccount_table[0]), $subaccount_table);
+      }
+    }
+  }
+}
+
+function sopac_subaccounts_add_page($account) {
+  $content .= '<h1>Add Library Card:</h1>';
+  $content .= drupal_get_form('sopac_subaccounts_add_form', $account);
+
+  return $content;
+}
+
+function sopac_subaccounts_add_form($form_state, $account) {
+  $form['account'] = array(
+    '#type' => 'value',
+    '#value' => $account,
+  );
+  $form['lcard'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Library Card Number'),
+    '#size' => 30,
+    '#maxlength' => 14,
+    '#description' => t('This is the 14 digit number that is located on the back of your Ann Arbor District Library library card.'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add Card'),
+  );
+
+  return $form;
+}
+
+function sopac_subaccounts_add_form_validate($form, &$form_state) {
+  $form_state['values']['profile_pref_cardnum'] = ereg_replace("[^0-9]", "", $form_state['values']['profile_pref_cardnum']);
+
+  if (strlen($form_state['values']['lcard']) != 14) {
+    form_set_error('lcard', t('Your Library Card Number must be 14 digits long'));
+  }
+  else if (substr($form_state['values']['lcard'], 1, 4) != "1621") {
+    form_set_error('lcard', t('Your Library Card Number must start with 21621'));
+  }
+}
+
+function sopac_subaccounts_add_form_submit($form, &$form_state) {
+  $account = $form_state['values']['account'];
+  $lcard = $form_state['values']['lcard'];
+  drupal_goto('user/' . $account->uid . '/verifycard/' . $lcard);
+}
+
+function sopac_subaccounts_verify_page($account, $lcard = 0) {
+  $content = '';
+  if (sopac_subaccounts_lcard_verified($account->uid, $lcard)) {
+    sopac_subaccounts_add_card($account, $lcard);
+    drupal_set_message("Library Card $lcard is verified for this account");
+    drupal_goto('user');
+  }
+  else {
+    $content .= "<h1>Please verify library card $lcard for this account:</h1>";
+    $content .= drupal_get_form('sopac_bcode_verify_form', $account->uid, $lcard);
+  }
+  return $content;
+}
+
+function sopac_subaccounts_remove($account, $subID) {
+  $locum = sopac_get_locum();
+  $subaccounts = explode(',', $account->profile_pref_additional_cardnum);
+  $cardnum = $subaccounts[$subID];
+  $patinfo = $locum->get_patron_info($cardnum);
+  $patinfo_table = array(
+    array('Patron Name:', $patinfo['name']),
+    array('Card Number:', $patinfo['cardnum']),
+    array('# of Checkouts:', $patinfo['checkouts']),
+    array('Fine Balance:', '$' . number_format($patinfo['balance'], 2, '.', '')),
+  );
+
+  $content .= "<h1>Remove Library Card $cardnum from your Account</h1>";
+  $content .= theme('table', array('', 'Account Information'), $patinfo_table);
+  $content .= drupal_get_form('sopac_subaccounts_confirm_remove', $account, $subID);
+
+  return $content;
+}
+
+function sopac_subaccounts_confirm_remove(&$form_state, $account, $subID) {
+  $form = array();
+  $form['account'] = array(
+    '#type' => 'value',
+    '#value' => $account,
+  );
+  $form['subID'] = array(
+    '#type' => 'value',
+    '#value' => $subID,
+  );
+
+  return confirm_form(
+    $form,
+    t('Remove Card from your account'),
+    'user',
+    t('Are you sure you want to remove this card from your account? You will need to re-verify to reattach in the future. This action cannot be undone.'),
+    t('Remove'),
+    t('Cancel'),
+    'sopac_subaccounts_confirm_remove'
+  );
+}
+
+function sopac_subaccounts_confirm_remove_submit($form, &$form_state) {
+  $account = $form_state['values']['account'];
+  $subID = $form_state['values']['subID'];
+  $sub_cards = explode(',', $account->profile_pref_additional_cardnum);
+
+  $removed_card = $sub_cards[$subID];
+  unset($sub_cards[$subID]);
+  $update = array('profile_pref_additional_cardnum' => implode(',', $sub_cards));
+  user_save($account, $update);
+
+  drupal_set_message("Removed Library Card $removed_card from your account");
+  drupal_goto('user');
+}
+
+function sopac_subaccounts_page($subID) {
+  $content = '';
+
+  global $user;
+  $account = user_load($user->uid);
+
+  if ($account->profile_pref_additional_cardnum) {
+    $cards = explode(",", $account->profile_pref_additional_cardnum);
+    $locum = sopac_get_locum();
+    $locum_cfg = $locum->locum_config;
+
+    $subAccount = new stdClass;
+    $subAccount->profile_pref_cardnum = $cards[$subID];
+    $subAccount->locum_pass = '';
+    $patinfo = $locum->get_patron_info($cards[$subID]);
+
+    $content .= '<div class="profile">';
+    $content .= '<h3>Checkouts for ' . $patinfo['name'] . '</h3>';
+    $content .= sopac_user_chkout_table($subAccount, $locum);
+    $content .= '<h3>Requests for ' . $patinfo['name'] . '</h3>';
+    $content .= drupal_get_form('sopac_user_holds_form', $subAccount);
+    $content .= '</div>';
+  }
+
+  $content .= '<ul><li class="button green">' . l('Back to My Account', 'user') . '</li></ul>';
+
+  return $content;
+}
+
+function sopac_subaccounts_theme() {
+  return array(
+    'sopac_subaccount_table' => array(
+      'arguments' => array('element' => NULL),
+      'template' => 'sopac-subaccount-table',
+    ),
+    'sopac_subaccount' => array(
+      'arguments' => array('element' => NULL),
+      'template' => 'sopac-subaccount',
+    ),
+  );
+}
+
+function template_preprocess_sopac_subaccount_table(&$variables) {
+  $variables['title'] = check_plain($variables['element']['#title']);
+  $variables['uid'] = $variables['element']['#uid'];
+  $variables['subtable'] = $variables['element']['#subtable'];
+}
+
+function template_preprocess_sopac_subaccount(&$variables) {
+  $variables['anchor'] = check_plain($variables['element']['#anchor']);
+  $variables['title'] = check_plain($variables['element']['#title']);
+  $variables['full_path'] = check_plain($variables['element']['#full_path']);
+  $variables['remove_path'] = check_plain($variables['element']['#remove_path']);
+  $variables['checkout_total'] = $variables['element']['#checkout_total'];
+  $variables['checkouts'] = $variables['element']['#checkouts'];
+  $variables['hold_total'] = $variables['element']['#hold_total'];
+  $variables['holds'] = $variables['element']['#holds'];
+}
+
+/**
+ * Add an lcard as a sub account to an account, assumes card is already verified
+ */
+function sopac_subaccounts_add_card($account, $lcard) {
+  if (strlen($account->profile_pref_additional_cardnum)) {
+    $sub_cards = explode(',', $account->profile_pref_additional_cardnum);
+    if (!in_array($lcard, $sub_cards)) {
+      $sub_cards[] = $lcard;
+    }
+    $update = array('profile_pref_additional_cardnum' => implode(',', $sub_cards));
+  }
+  else {
+    $update = array('profile_pref_additional_cardnum' => $lcard);
+  }
+
+  user_save($account, $update);
+}
+
+/**
+ * Check if lcard is verified for this account
+ */
+function sopac_subaccounts_lcard_verified($uid, $lcard) {
+  $verified = FALSE;
+  $query = db_query("SELECT COUNT(*) AS vfy FROM {sopac_card_verify} " .
+                    "WHERE uid = %d AND cardnum = '%s' AND verified > 0",
+                    $uid, $lcard);
+  $db_obj = db_fetch_object($query);
+  if ($db_obj->vfy > 0) {
+    $verified = TRUE;
+  }
+
+  return $verified;
+}
+
+?>
