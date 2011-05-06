@@ -1,7 +1,20 @@
 <?php
+
+function sopac_subaccounts_perm() {
+  return array('access sopac subaccounts');
+}
+
 function sopac_subaccounts_menu() {
   $items = array();
 
+  $items['admin/settings/subaccounts'] = array(
+    'title' => t('SOPAC Subaccount Settings'),
+    'description' => 'Settings for SOPAC Subaccounts',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sopac_subaccounts_settings'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
   $items['user/subaccount'] = array(
     'title' => 'My Additional Account',
     'page callback' => 'sopac_subaccounts_page',
@@ -35,86 +48,93 @@ function sopac_subaccounts_menu() {
   return $items;
 }
 
+function sopac_subaccounts_settings() {
+  $form['sopac_subaccounts_promo_text'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Subaccounts Promo Text'),
+    '#default_value' => variable_get('sopac_subaccounts_promo_text', ''),
+    '#description' => t('HTML markup to appear below the Subaccounts table on the My Account page'),
+  );
+  return system_settings_form($form);
+}
+
 function sopac_subaccounts_user($op, &$edit, &$account, $category = NULL) {
-  if ($op == 'view') {
-    // Check for additional cards
-    if ($account->profile_pref_cardnum) {
-      drupal_add_css(drupal_get_path('module', 'sopac_subaccounts') . '/sopac_subaccounts.css');
-      $subaccount_table = array();
-      $locum = sopac_get_locum();
-      $locum_cfg = $locum->locum_config;
+  if (user_access('access sopac subaccounts') && $op == 'view' && $account->profile_pref_cardnum) {
+    drupal_add_css(drupal_get_path('module', 'sopac_subaccounts') . '/sopac_subaccounts.css');
+    $subaccount_table = array();
+    $locum = sopac_get_locum();
+    $locum_cfg = $locum->locum_config;
 
-      if (strlen($account->profile_pref_additional_cardnum)) {
-        foreach(explode(",", $account->profile_pref_additional_cardnum) as $n => $cardnum) {
-          $content = '';
-          $patinfo = $locum->get_patron_info($cardnum);
-          $account->content['addl_patron' . $n]['#title'] = $patinfo['name'] . "'s " . t(' Account Details');
-          $account->content['addl_patron' . $n]['#weight'] = $n + 4;
-          $account->content['addl_patron' . $n]['#type'] = 'sopac_subaccount';
-          $account->content['addl_patron' . $n]['#full_path'] = 'user/subaccount/' . $n;
-          $account->content['addl_patron' . $n]['#remove_path'] = 'user/' . $account->uid . '/removecard/' . $n;
-          $account->content['addl_patron' . $n]['#anchor'] = 'subaccount' . $n;
+    if (strlen($account->profile_pref_additional_cardnum)) {
+      foreach(explode(",", $account->profile_pref_additional_cardnum) as $n => $cardnum) {
+        $content = '';
+        $patinfo = $locum->get_patron_info($cardnum);
+        $account->content['addl_patron' . $n]['#title'] = $patinfo['name'] . "'s " . t(' Account Details');
+        $account->content['addl_patron' . $n]['#weight'] = $n + 4;
+        $account->content['addl_patron' . $n]['#type'] = 'sopac_subaccount';
+        $account->content['addl_patron' . $n]['#full_path'] = 'user/subaccount/' . $n;
+        $account->content['addl_patron' . $n]['#remove_path'] = 'user/' . $account->uid . '/removecard/' . $n;
+        $account->content['addl_patron' . $n]['#anchor'] = 'subaccount' . $n;
 
-          // Checkouts
-          $checkouts = $locum->get_patron_checkouts($cardnum, $locum_pass);
-          if ($checkout_total = count($checkouts)) {
-            $rows = array();
-            foreach($checkouts as $checkout) {
-              $rows[] = array(
-                'Title' => $checkout['title'],
-                'Format' => $locum_cfg['formats'][$checkout['bib']['mat_code']],
-                'Author' => $checkout['author'],
-                'Renews' => $checkout['numrenews'],
-                'Due Date' => date('m-d-Y', $checkout['duedate']),
-              );
-            }
-            $checkout_table = theme('table', array_keys($rows[0]), $rows);
+        // Checkouts
+        $checkouts = $locum->get_patron_checkouts($cardnum, $locum_pass);
+        if ($checkout_total = count($checkouts)) {
+          $rows = array();
+          foreach($checkouts as $checkout) {
+            $rows[] = array(
+              'Title' => $checkout['title'],
+              'Format' => $locum_cfg['formats'][$checkout['bib']['mat_code']],
+              'Author' => $checkout['author'],
+              'Renews' => $checkout['numrenews'],
+              'Due Date' => date('m-d-Y', $checkout['duedate']),
+            );
           }
-          else {
-            $checkout_table = t('No items checked out.');
-          }
-          $account->content['addl_patron' . $n]['#checkout_total'] = $checkout_total;
-          $account->content['addl_patron' . $n]['#checkouts'] = $checkout_table;
-
-          // Holds
-          $holds = $locum->get_patron_holds($cardnum, $ils_pass);
-          if ($hold_total = count($holds)) {
-            $rows = array();
-            foreach($holds as $hold) {
-              $rows[] = array(
-                'Title' => $hold['title'],
-                'Format' => $locum_cfg['formats'][$hold['bib']['mat_code']],
-                'Author' => $hold['author'],
-                'Status' => $hold['numrenews'],
-                'Pickup Location' => date('m-d-Y', $checkout['duedate']),
-              );
-            }
-            $holds_table = theme('table', array_keys($rows[0]), $rows);
-          }
-          else {
-            $holds_table = t('No items requested.');
-          }
-          $account->content['addl_patron' . $n]['#hold_total'] = $hold_total;
-          $account->content['addl_patron' . $n]['#holds'] = $holds_table;
-
-          // Add to summary table
-          $subaccount_table[] = array(
-            'Name' => l($patinfo['name'], '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
-            'Checkouts' => $checkout_total,
-            'Requests' => $hold_total,
-            'Balance' => '$' . number_format($userinfo['balance'], 2, '.', ''),
-            'Details' => l('Jump to Details', '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
-          );
+          $checkout_table = theme('table', array_keys($rows[0]), $rows);
         }
-      }
+        else {
+          $checkout_table = t('No items checked out.');
+        }
+        $account->content['addl_patron' . $n]['#checkout_total'] = $checkout_total;
+        $account->content['addl_patron' . $n]['#checkouts'] = $checkout_table;
 
-      $account->content['addl_accounts']['#title'] = t('Additional Accounts');
-      $account->content['addl_accounts']['#weight'] = 1;
-      $account->content['addl_accounts']['#type'] = 'sopac_subaccount_table';
-      $account->content['addl_accounts']['#uid'] = $account->uid;
-      if (count($subaccount_table)) {
-        $account->content['addl_accounts']['#subtable'] = theme('table', array_keys($subaccount_table[0]), $subaccount_table);
+        // Holds
+        $holds = $locum->get_patron_holds($cardnum, $ils_pass);
+        if ($hold_total = count($holds)) {
+          $rows = array();
+          foreach($holds as $hold) {
+            $rows[] = array(
+              'Title' => $hold['title'],
+              'Format' => $locum_cfg['formats'][$hold['bib']['mat_code']],
+              'Author' => $hold['author'],
+              'Status' => $hold['numrenews'],
+              'Pickup Location' => date('m-d-Y', $checkout['duedate']),
+            );
+          }
+          $holds_table = theme('table', array_keys($rows[0]), $rows);
+        }
+        else {
+          $holds_table = t('No items requested.');
+        }
+        $account->content['addl_patron' . $n]['#hold_total'] = $hold_total;
+        $account->content['addl_patron' . $n]['#holds'] = $holds_table;
+
+        // Add to summary table
+        $subaccount_table[] = array(
+          'Name' => l($patinfo['name'], '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
+          'Checkouts' => $checkout_total,
+          'Requests' => $hold_total,
+          'Balance' => '$' . number_format($userinfo['balance'], 2, '.', ''),
+          'Details' => l('Jump to Details', '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
+        );
       }
+    }
+
+    $account->content['addl_accounts']['#title'] = t('Additional Accounts');
+    $account->content['addl_accounts']['#weight'] = 1;
+    $account->content['addl_accounts']['#type'] = 'sopac_subaccount_table';
+    $account->content['addl_accounts']['#uid'] = $account->uid;
+    if (count($subaccount_table)) {
+      $account->content['addl_accounts']['#subtable'] = theme('table', array_keys($subaccount_table[0]), $subaccount_table);
     }
   }
 }
@@ -189,7 +209,7 @@ function sopac_subaccounts_remove($account, $subID) {
     array('Fine Balance:', '$' . number_format($patinfo['balance'], 2, '.', '')),
   );
 
-  $content .= "<h1>Remove Library Card $cardnum from your Account</h1>";
+  $content .= "<h1>Remove Library Card $cardnum from your aadl.org account</h1>";
   $content .= theme('table', array('', 'Account Information'), $patinfo_table);
   $content .= drupal_get_form('sopac_subaccounts_confirm_remove', $account, $subID);
 
@@ -211,7 +231,7 @@ function sopac_subaccounts_confirm_remove(&$form_state, $account, $subID) {
     $form,
     t('Remove Card from your account'),
     'user',
-    t('Are you sure you want to remove this card from your account? You will need to re-verify to reattach in the future. This action cannot be undone.'),
+    t('Are you sure you want to remove this card from your aadl.org account? You will need to re-verify to reattach in the future. This action cannot be undone.'),
     t('Remove'),
     t('Cancel'),
     'sopac_subaccounts_confirm_remove'
@@ -278,6 +298,7 @@ function template_preprocess_sopac_subaccount_table(&$variables) {
   $variables['title'] = check_plain($variables['element']['#title']);
   $variables['uid'] = $variables['element']['#uid'];
   $variables['subtable'] = $variables['element']['#subtable'];
+  $variables['promo_text'] = variable_get('sopac_subaccounts_promo_text', '');
 }
 
 function template_preprocess_sopac_subaccount(&$variables) {

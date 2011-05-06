@@ -6,6 +6,8 @@
 
   <p>[ <?php print l('Add an additional library card', "user/$uid/addcard"); ?> ]</p>
 
+  <?php print $promo_text; ?>
+
 </div></div>
 
 <div style="clear: both"></div>
