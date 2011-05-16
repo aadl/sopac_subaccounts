@@ -7,10 +7,16 @@
   background-color: #FFFFDD;
 }
 
-.sopac-subaccount .remove-card {
+.sopac-subaccount .subaccount-manage {
   float: right;
-  width: 160px;
   margin-bottom: -15px;
+}
+
+.sopac-subaccount .subaccount-remove {
+  float: right;
+  margin-bottom: -15px;
+  padding-left: 10px;
+  width: 128px;
 }
 
 .sopac-subaccount h3 {
@@ -25,10 +31,6 @@
 .sopac-subaccount .checkouts {
   margin-right: 5px;
 }
-.sopac-subaccount .renew-items {
-  width: 160px;
-  margin-left: auto;
-}
 
 .sopac-subaccount .holds-wrapper {
   width: 50%;
@@ -36,10 +38,6 @@
 }
 .sopac-subaccount .holds {
   margin-left: 5px;
-}
-.sopac-subaccount .cancel-requests {
-  width: 160px;
-  margin-left: auto;
 }
 
 .sopac-subaccount table {
