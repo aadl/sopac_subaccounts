@@ -59,7 +59,11 @@ function sopac_subaccounts_settings() {
 }
 
 function sopac_subaccounts_user($op, &$edit, &$account, $category = NULL) {
-  if ($op == 'view' && $account->profile_pref_cardnum && user_access('access sopac subaccounts')) {
+
+  if ($op == 'view' &&
+      $account->profile_pref_cardnum &&
+      user_access('access sopac subaccounts') &&
+      !variable_get('sopac_catalog_disabled', FALSE)) {
     drupal_add_css(drupal_get_path('module', 'sopac_subaccounts') . '/sopac_subaccounts.css');
     $subaccount_table = array();
     $locum = sopac_get_locum();
