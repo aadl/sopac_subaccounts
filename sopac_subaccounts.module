@@ -127,7 +127,7 @@ function sopac_subaccounts_user($op, &$edit, &$account, $category = NULL) {
           'Name' => l($patinfo['name'], '', array('fragment' => 'subaccount' . $n, 'external' => TRUE)),
           'Checkouts' => $checkout_total,
           'Requests' => $hold_total,
-          'Balance' => '$' . number_format($userinfo['balance'], 2, '.', ''),
+          'Balance' => '$' . number_format($patinfo['balance'], 2, '.', ''),
         );
       }
     }
