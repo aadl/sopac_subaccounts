@@ -270,10 +270,10 @@ function sopac_subaccounts_page($subID) {
     $subAccount->profile_pref_cardnum = $cards[$subID];
     $subAccount->locum_pass = '';
     $patinfo = $locum->get_patron_info($cards[$subID]);
-
+    $checkout_table = sopac_user_chkout_table($subAccount, $locum);
     $content .= '<div class="profile">';
     $content .= '<h3>Checkouts for ' . $patinfo['name'] . '</h3>';
-    $content .= sopac_user_chkout_table($subAccount, $locum);
+    $content .= $checkout_table['content'];
     $content .= '<h3>Requests for ' . $patinfo['name'] . '</h3>';
     $content .= drupal_get_form('sopac_user_holds_form', $subAccount);
     $content .= '</div>';
